@@ -199,13 +199,13 @@ class BackgroundRemovalService:
             logger.error(f"Mask generation failed: {e}")
             raise HTTPException(status_code=500, detail=f"Mask generation failed: {str(e)}")
     
-    def upload_to_s3(self, local_folder: str, subfolder: str) -> list[str]:
-        """Upload folder to S3 and return presigned URLs."""
+    def upload_to_s3(self, local_folder: str, subfolder: str) -> dict[str, str]:
+        """Upload folder to S3 and return presigned URLs mapped by filename prefixes."""
         if not self.s3_client:
             raise HTTPException(status_code=500, detail="S3 not configured")
         
         try:
-            presigned_urls = []
+            presigned_urls = {}
             
             for root, _, files in os.walk(local_folder):
                 for filename in files:
@@ -227,7 +227,17 @@ class BackgroundRemovalService:
                         Params={"Bucket": Config.S3_BUCKET_NAME, "Key": s3_key},
                         ExpiresIn=Config.S3_PRESIGNED_URL_EXPIRATION,
                     )
-                    presigned_urls.append(url)
+                    
+                    # Map filename to presigned URL based on filename prefix
+                    if filename.startswith('mask'):
+                        presigned_urls['mask'] = url
+                    elif filename.startswith('output'):
+                        presigned_urls['output'] = url
+                    # Add more conditions for other filename patterns if needed
+                    else:
+                        # Use the filename without extension as key, or keep original logic
+                        file_key = os.path.splitext(filename)[0]
+                        presigned_urls[file_key] = url
             
             logger.info(f"Uploaded {len(presigned_urls)} files to S3")
             return presigned_urls
@@ -235,7 +245,7 @@ class BackgroundRemovalService:
         except ClientError as e:
             logger.error(f"S3 upload failed: {e}")
             raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
-    
+        
     def cleanup(self):
         """Cleanup resources."""
         if torch.cuda.is_available():
@@ -542,8 +552,7 @@ if __name__ == "__main__":
     import uvicorn
     
     uvicorn.run(
-        "main4:app",
-        # host="0.0.0.0",
+        "app:app",
         port=8000,
         reload=True,
         log_level="info"
