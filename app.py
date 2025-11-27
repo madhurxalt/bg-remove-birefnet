@@ -296,7 +296,8 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Background Removal API")
     Config.validate()
     os.makedirs(Config.TEMP_DIR, exist_ok=True)
-    
+
+    service.model
     yield
     
     # Shutdown
@@ -338,7 +339,7 @@ async def download_image(url: str, save_path: str) -> str:
     import httpx
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=None) as client:
             response = await client.get(url)
             response.raise_for_status()
             
